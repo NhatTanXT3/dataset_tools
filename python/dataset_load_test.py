@@ -164,17 +164,16 @@ def analyze_groundtruth_sensors(dataset, body_name):
     Analyze groundtruth/pose sensors in the dataset
     """
     pose_sensors = []
+    sensor_names_added = set()  # Track sensor names to avoid duplicates
     
-    # Check for different groundtruth sensor types
-    for sensor_type in ['pose', 'visual-inertial']:
-        pose_sensors.extend(get_sensor_by_type(dataset, body_name, sensor_type))
-    
-    # Also check for specific groundtruth sensor names
-    try:
-        gt_sensor = get_sensor_by_name(dataset, body_name, 'state_groundtruth_estimate0')
-        pose_sensors.append(gt_sensor)
-    except ValueError:
-        pass
+    # Check for different groundtruth sensor types (including position sensors)
+    for sensor_type in ['pose', 'visual-inertial', 'position']:
+        sensors = get_sensor_by_type(dataset, body_name, sensor_type)
+        for sensor in sensors:
+            sensor_name = sensor['name']
+            if sensor_name not in sensor_names_added:
+                pose_sensors.append(sensor)
+                sensor_names_added.add(sensor_name)
     
     if not pose_sensors:
         return
