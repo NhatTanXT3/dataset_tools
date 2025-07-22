@@ -54,12 +54,15 @@ try:
         extract_sensor_parameters
     )
     from .sensor_data_loader import dataset_load_sensor_data
+    from .dataset_plot import dataset_plot, plot_euroc_dataset
     
     __all__ = [
         'dataset_load',
         'get_sensor_by_name', 
         'get_sensor_by_type',
         'print_dataset_summary',
+        'dataset_plot',
+        'plot_euroc_dataset',
         'q_min', 'q_C2q', 'q_q2C', 'q_mul', 'q_inv', 'q_norm', 'skew_op',
         'dataset_read_yaml', 
         'parse_transformation_matrix',

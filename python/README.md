@@ -84,7 +84,36 @@ R_reconstructed = q_q2C(q)
 q_minimal = q_min(quaternions)
 ```
 
+### 🎨 Interactive Visualization with Rerun
+
+The Python implementation includes **interactive 3D visualization** using rerun (equivalent to MATLAB `dataset_plot`):
+
+```python
+from dataset_tools.python import dataset_plot
+
+# Load and visualize dataset
+dataset = dataset_load('../../EuRoc_ASL/MH_01_easy')
+dataset_plot(dataset, max_time_sec=30.0)  # Visualize first 30 seconds
+```
+
+**Features:**
+- **3D Scene**: Sensor configuration, coordinate frames, trajectory path
+- **Time Series**: Interactive IMU gyroscope and accelerometer plots  
+- **Pose Markers**: 3D coordinate frames along trajectory
+- **Camera Calibration**: Target points and observation rays (if available)
+
+**Demo Script:**
+```bash
+# Quick demo with various options
+python demo_plot.py                          # Default: MH_01_easy, 30s
+python demo_plot.py V1_01_easy 60           # Vicon dataset, 60s  
+python demo_plot.py --list-datasets         # Show available datasets
+python demo_plot.py --summary MH_02_easy    # With dataset summary
+```
+
 ## 🔧 Command Line Usage
+
+### Dataset Loading and Analysis
 
 Run the test script (equivalent to MATLAB `dataset_load_test.m`):
 
@@ -100,6 +129,24 @@ python dataset_load_test.py --validate-quaternions
 
 # Summary only (no detailed analysis)
 python dataset_load_test.py --summary-only
+
+# With interactive visualization (equivalent to MATLAB dataset_plot)
+python dataset_load_test.py --plot --max-time 60
+```
+
+### Interactive Visualization
+
+Launch rerun visualization (equivalent to MATLAB `dataset_plot`):
+
+```bash
+# Demo script with built-in dataset selection
+python demo_plot.py                          # Default visualization
+python demo_plot.py MH_02_easy              # Specific dataset
+python demo_plot.py V1_01_easy 60           # 60 seconds duration
+python demo_plot.py --list-datasets         # Show available datasets
+
+# Direct plotting
+python dataset_plot.py ../../EuRoc_ASL/MH_01_easy 30.0
 ```
 
 ## 📁 Module Overview
@@ -110,6 +157,8 @@ python dataset_load_test.py --summary-only
 - **`sensor_data_loader.py`**: CSV sensor data parsing (equivalent to `dataset_load_sensor_data.m`)
 - **`yaml_reader.py`**: YAML configuration parsing (equivalent to `dataset_read_yaml.m`)
 - **`quaternion_utils.py`**: Quaternion operations (equivalent to `quaternion/` folder)
+- **`dataset_plot.py`**: Interactive rerun visualization (equivalent to `dataset_plot.m`)
+- **`demo_plot.py`**: User-friendly visualization demo script
 
 ### Supported Sensor Types
 
@@ -152,6 +201,7 @@ This implementation maintains **100% compatibility** with the original MATLAB co
 | `q_q2C()` | `q_q2C()` | ✅ Identical rotation matrices |
 | `q_min()` | `q_min()` | ✅ Same minimal representation |
 | `q_mul()` | `q_mul()` | ✅ Identical quaternion algebra |
+| `dataset_plot()` | `dataset_plot()` | ✅ Interactive rerun visualization |
 
 ## 🐛 Troubleshooting
 

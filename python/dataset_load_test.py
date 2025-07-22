@@ -16,6 +16,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from dataset_loader import dataset_load, print_dataset_summary, get_sensor_by_name, get_sensor_by_type
 from quaternion_utils import validate_quaternion_conventions
+from dataset_plot import dataset_plot
 import numpy as np
 
 
@@ -31,6 +32,10 @@ def main():
                        help='Run quaternion validation tests')
     parser.add_argument('--summary-only', action='store_true',
                        help='Only print dataset summary without detailed analysis')
+    parser.add_argument('--plot', action='store_true',
+                       help='Launch rerun visualization (equivalent to MATLAB dataset_plot)')
+    parser.add_argument('--max-time', type=float, default=30.0,
+                       help='Maximum time duration to visualize in seconds (default: 30s)')
     
     args = parser.parse_args()
     
@@ -63,6 +68,15 @@ def main():
         if not args.summary_only:
             # Perform detailed analysis
             analyze_dataset(dataset)
+        
+        # Launch rerun visualization if requested (equivalent to MATLAB dataset_plot)
+        if args.plot:
+            print('')
+            print('Launching rerun visualization...')
+            dataset_plot(dataset, 
+                        recording_name=f"EuRoC_{args.dataset_path.split('/')[-1]}", 
+                        spawn_viewer=True, 
+                        max_time_sec=args.max_time)
             
         print('')
         print('✓ Dataset loading test completed successfully!')
