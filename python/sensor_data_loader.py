@@ -2,7 +2,7 @@
 Sensor data loader for dataset loading - MATLAB compatibility layer
 Matches MATLAB dataset_load_sensor_data.m functionality for CSV parsing
 
-Supports different sensor types: IMU, camera, position, pose, visual-inertial, etc.
+Supports different sensor types: IMU, camera, position, pose, visual-inertial, pointcloud, etc.
 """
 
 import os
@@ -10,6 +10,18 @@ import numpy as np
 import pandas as pd
 from typing import Dict, Any, Union
 from quaternion_utils import q_min, q_C2q
+
+try:
+    from plyfile import PlyData, PlyElement
+    PLY_AVAILABLE = True
+except ImportError:
+    PLY_AVAILABLE = False
+
+try:
+    import pyminiply
+    MINIPLY_AVAILABLE = True
+except ImportError:
+    MINIPLY_AVAILABLE = False
 
 
 def dataset_load_sensor_data(sensor_type: str, sensor_folder_name: str) -> Dict[str, Any]:
@@ -23,6 +35,10 @@ def dataset_load_sensor_data(sensor_type: str, sensor_folder_name: str) -> Dict[
     Returns:
         Dictionary containing parsed sensor data with timestamps and sensor-specific fields
     """
+    # For pointcloud, we expect a PLY file instead of CSV
+    if sensor_type == 'pointcloud':
+        return _load_pointcloud_data(sensor_folder_name)
+
     csv_filename = os.path.join(sensor_folder_name, 'data.csv')
     
     if not os.path.exists(csv_filename):
@@ -42,8 +58,6 @@ def dataset_load_sensor_data(sensor_type: str, sensor_folder_name: str) -> Dict[
         data = _load_visual_inertial_data(csv_filename)
     elif sensor_type == 'camera_target':
         data = _load_camera_target_data(sensor_folder_name)
-    elif sensor_type == 'pointcloud':
-        data = {}  # Empty data for pointcloud (as in MATLAB)
     else:
         raise ValueError(f"Unknown sensor type: {sensor_type}")
     
@@ -152,6 +166,92 @@ def _load_visual_inertial_data(csv_filename: str) -> Dict[str, np.ndarray]:
         'bw_S': gyro_bias,              # gyroscope bias (3 x N)
         'ba_S': accel_bias              # accelerometer bias (3 x N)
     }
+    
+    return data
+
+
+def _load_pointcloud_data(sensor_folder_name: str) -> Dict[str, np.ndarray]:
+    """
+    Load pointcloud sensor data from PLY file
+    
+    Expected file: data.ply in sensor folder
+    Returns pointcloud with positions data
+    
+    Uses pyminiply if available (faster), falls back to plyfile
+    """
+    ply_filename = os.path.join(sensor_folder_name, 'data.ply')
+    
+    if not os.path.exists(ply_filename):
+        raise FileNotFoundError(f"PLY file not found: {ply_filename}")
+    
+    # Try pyminiply first (faster)
+    if MINIPLY_AVAILABLE:
+        return _load_pointcloud_with_pyminiply(ply_filename)
+    elif PLY_AVAILABLE:
+        return _load_pointcloud_with_plyfile(ply_filename)
+    else:
+        raise ImportError("Neither pyminiply nor plyfile library available. Install with: pip install plyfile")
+
+
+def _load_pointcloud_with_pyminiply(ply_filename: str) -> Dict[str, np.ndarray]:
+    """
+    Load pointcloud using pyminiply library
+    """
+    import pyminiply
+    
+    # Read PLY file - returns vertices, indices, normals, uv, color, intensity
+    vertices, indices, normals, uv, color, intensity = pyminiply.read(ply_filename)
+    
+    if vertices is None or len(vertices) == 0:
+        raise ValueError(f"No vertex data found in PLY file: {ply_filename}")
+    
+    # Convert to (3, N) format to match MATLAB convention
+    if vertices.shape[1] == 3:
+        positions = vertices.T  # (N, 3) -> (3, N)
+    else:
+        raise ValueError(f"Invalid vertex data shape: {vertices.shape}, expected (N, 3)")
+    
+    n_points = positions.shape[1]
+    
+    data = {
+        'positions': positions  # Point positions (3 x N)
+    }
+    
+    # Add intensity if available
+    if intensity.size > 0:
+        data['intensity'] = intensity  # Intensity values (N,)
+        print(f"     Loaded pointcloud with {n_points} points and intensity (using pyminiply)")
+    else:
+        print(f"     Loaded pointcloud with {n_points} points (using pyminiply)")
+    
+    return data
+
+
+def _load_pointcloud_with_plyfile(ply_filename: str) -> Dict[str, np.ndarray]:
+    """
+    Load pointcloud using plyfile library (fallback)
+    """
+    # Read PLY file
+    plydata = PlyData.read(ply_filename)
+    
+    if 'vertex' not in plydata:
+        raise ValueError(f"No vertex data found in PLY file: {ply_filename}")
+    
+    vertex_element = plydata['vertex']
+    vertex_data = vertex_element.data  # Get the actual numpy array
+    n_points = len(vertex_data)
+    
+    # Extract point positions (required) - ensure (3, N) format
+    positions = np.zeros((3, n_points))
+    positions[0, :] = vertex_data['x']
+    positions[1, :] = vertex_data['y'] 
+    positions[2, :] = vertex_data['z']
+    
+    data = {
+        'positions': positions  # Point positions (3 x N)
+    }
+    
+    print(f"     Loaded pointcloud with {n_points} points (using plyfile)")
     
     return data
 

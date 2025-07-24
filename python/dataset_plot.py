@@ -62,11 +62,24 @@ def dataset_plot(dataset: Dict[str, List[Dict[str, Any]]],
         body_name = body['name']
         print(f'   plotting body [{body_name}]')
         
-        # Create namespace for this body
-        reference_prefix = f"/ref_{body_name}"
+        # Check if we have pointcloud sensors with T_WR (world reference frame)
+        has_pointcloud_with_world_frame = False
+        for sensor in body.get('sensor', []):
+            if sensor.get('sensor_type') == 'pointcloud' and 'T_WR' in sensor:
+                has_pointcloud_with_world_frame = True
+                break
+        
+        # Create namespace for this body (use world frame if pointcloud present)
+        if has_pointcloud_with_world_frame:
+            reference_prefix = f"/world/ref_{body_name}"
+        else:
+            reference_prefix = f"/ref_{body_name}"
 
         # Plot sensor configuration (static)
         plot_body_sensor_setup(body, reference_prefix)
+        
+        # Plot pointcloud data (static)
+        plot_pointcloud(body, reference_prefix)
         
         # Plot ground truth trajectory (progressive over time)
         plot_position_ground_truth(body, reference_prefix, max_time_sec)
@@ -144,18 +157,52 @@ def plot_body_sensor_setup(body: Dict[str, Any], reference_prefix: str) -> None:
     body_name = body['name']
     sensors = body.get('sensor', [])
 
+    # Log world-to-reference transformation if we have pointcloud with T_WR
+    for sensor in sensors:
+        if sensor.get('sensor_type') == 'pointcloud' and 'T_WR' in sensor:
+            T_WR = sensor['T_WR']
+            
+            # Extract position and rotation from T_WR
+            position = T_WR[:3, 3]
+            rotation_matrix = T_WR[:3, :3]
+            
+            # Log the world-to-reference transformation at the reference prefix
+            rr.log(
+                reference_prefix,
+                rr.Transform3D(
+                    translation=position,
+                    mat3x3=rotation_matrix,
+                ),
+                static=True,
+            )
+            
+            # Add world reference frame axes
+            # rr.log(
+            #     f"{reference_prefix}/world_axes",
+            #     rr.Arrows3D(
+            #         origins=[[0, 0, 0], [0, 0, 0], [0, 0, 0]],
+            #         vectors=[[1.0, 0, 0], [0, 1.0, 0], [0, 0, 1.0]],
+            #         colors=[[255, 0, 0], [0, 255, 0], [0, 0, 255]],  # Red, Green, Blue
+            #         labels=["World_X", "World_Y", "World_Z"],
+            #         show_labels=True
+            #     ),
+            #     static=True,
+            # )
+            
+            print(f'     plotting world-reference frame transformation')
+            break  # Only need to do this once per body
     
     # Plot sensors
     for sensor in sensors:
         sensor_name = sensor['name']
         sensor_type = sensor['sensor_type']
         sensor_prefix = f"{reference_prefix}/{body_name}/{sensor_name}"
+        
         if sensor_type == 'camera' and 'camera_model' in sensor and sensor['camera_model'] == 'pinhole':
             print(f'     plotting camera [{sensor_name}]')
             intrinsics = sensor['intrinsics']
             resolution = sensor['resolution']
             intrinsics_rerun = rr.datatypes.Mat3x3([[intrinsics[0], 0, intrinsics[2]], [0, intrinsics[1], intrinsics[3]], [0, 0, 1]])
-            print(intrinsics)
             rr.log(
                 f"{sensor_prefix}/images",
                 rr.Pinhole(
@@ -210,6 +257,109 @@ def plot_body_sensor_setup(body: Dict[str, Any], reference_prefix: str) -> None:
             print(f'     detected data with world-reference extrinsics [{sensor_name}]')
         else:
             print(f'     detected data without body-sensor extrinsics [{sensor_name}]')
+
+
+def plot_pointcloud(body: Dict[str, Any], reference_prefix: str) -> None:
+    """
+    Plot pointcloud data (static 3D points) with intensity-based coloring
+    
+    Args:
+        body: Body dictionary with sensor data
+        reference_prefix: Rerun path prefix for this body
+    
+    Features:
+        - Uses intensity data for monochrome coloring (dark=low intensity, bright=high intensity)
+        - Automatically subsamples large pointclouds (>500K points) for performance
+        - Falls back to uniform gray if no intensity data available
+    """
+    body_name = body['name']
+    sensors = body.get('sensor', [])
+    
+    # Find pointcloud sensors
+    for sensor in sensors:
+        if sensor.get('sensor_type') == 'pointcloud':
+            sensor_name = sensor['name']
+            data = sensor.get('data', {})
+            
+            if 'positions' not in data:
+                print(f'     no pointcloud data available for [{sensor_name}]')
+                continue
+            
+            positions = data['positions']  # Shape: (3, N)
+            n_points = positions.shape[1]
+            
+            # Convert to (N, 3) format for rerun
+            points_rerun = positions.T  # (3, N) -> (N, 3)
+            
+            # Extract intensity data if available
+            intensity = data.get('intensity', None)
+            
+            # Use subsampling for very large pointclouds to improve performance
+            max_points_display = 50000000  # Limit for visualization performance
+            subsample_indices = None
+            if n_points > max_points_display:
+                # Subsample points uniformly
+                step = n_points // max_points_display
+                subsample_indices = np.arange(0, n_points, step)
+                points_rerun = points_rerun[subsample_indices]
+                n_display = len(points_rerun)
+                print(f'     plotting pointcloud [{sensor_name}]: {n_display}/{n_points} points (subsampled for performance)')
+            else:
+                print(f'     plotting pointcloud [{sensor_name}]: {n_points} points')
+            
+            # Prepare colors based on intensity
+            if intensity is not None and len(intensity) > 0:
+                # Use intensity for monochrome coloring
+                intensity_values = intensity
+                if subsample_indices is not None:
+                    intensity_values = intensity[subsample_indices]
+                
+                # Normalize intensity to 0-255 range for grayscale
+                intensity_min = np.min(intensity_values)
+                intensity_max = np.max(intensity_values)
+                if intensity_max > intensity_min:
+                    # Normalize to 0-1, then scale to 0-255
+                    normalized_intensity = (intensity_values - intensity_min) / (intensity_max - intensity_min)
+                    grayscale_values = (normalized_intensity * 255).astype(np.uint8)
+                else:
+                    # Handle case where all intensities are the same
+                    grayscale_values = np.full(len(intensity_values), 128, dtype=np.uint8)
+                
+                # Create RGB colors from grayscale (R=G=B for monochrome)
+                colors = np.column_stack([grayscale_values, grayscale_values, grayscale_values])
+                
+                print(f'       with intensity coloring: range [{intensity_min:.4f}, {intensity_max:.4f}]')
+            else:
+                # Fallback to uniform gray color
+                colors = [128, 128, 128]
+                print(f'       using uniform gray color (no intensity data)')
+            
+            # Create pointcloud path
+            pointcloud_prefix = f"{reference_prefix}/pointclouds/{sensor_name}"
+            
+            # Log pointcloud points
+            rr.log(
+                f"{pointcloud_prefix}/points",
+                rr.Points3D(
+                    positions=points_rerun,
+                    colors=colors,
+                    radii=0.002,  # Small point size
+                ),
+                static=True,
+            )
+            
+            # Log pointcloud metadata
+            if intensity is not None and len(intensity) > 0:
+                metadata_text = f"Pointcloud: {n_points} points total\nIntensity range: [{np.min(intensity):.4f}, {np.max(intensity):.4f}]"
+            else:
+                metadata_text = f"Pointcloud: {n_points} points total\nNo intensity data"
+            
+            rr.log(
+                f"{pointcloud_prefix}/info",
+                rr.TextLog(metadata_text),
+                static=True,
+            )
+
 
 def plot_position_ground_truth(body: Dict[str, Any], reference_prefix: str, max_time_sec: float = float('inf')) -> None:
     """

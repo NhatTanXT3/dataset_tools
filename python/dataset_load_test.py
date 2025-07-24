@@ -107,6 +107,7 @@ def analyze_dataset(dataset):
         # Check for common sensors
         analyze_imu_sensors(dataset, body_name)
         analyze_camera_sensors(dataset, body_name)
+        analyze_pointcloud_sensors(dataset, body_name)
         analyze_groundtruth_sensors(dataset, body_name)
 
 
@@ -175,6 +176,46 @@ def analyze_camera_sensors(dataset, body_name):
                 intrinsics = camera['intrinsics']
                 print(f'      Intrinsics: fu={intrinsics[0]:.1f}, fv={intrinsics[1]:.1f}, '
                      f'cu={intrinsics[2]:.1f}, cv={intrinsics[3]:.1f}')
+
+
+def analyze_pointcloud_sensors(dataset, body_name):
+    """
+    Analyze pointcloud sensors in the dataset
+    """
+    pointcloud_sensors = get_sensor_by_type(dataset, body_name, 'pointcloud')
+    
+    if not pointcloud_sensors:
+        return
+        
+    print(f'  Pointcloud Sensors ({len(pointcloud_sensors)}):')
+    
+    for pointcloud in pointcloud_sensors:
+        name = pointcloud['name']
+        data = pointcloud.get('data', {})
+        
+        if 'positions' in data:
+            positions = data['positions']  # Shape: (3, N)
+            n_points = positions.shape[1]
+            
+            print(f'    {name}: {n_points} points (static pointcloud)')
+            
+            # Compute bounding box
+            pos_min = np.min(positions, axis=1)
+            pos_max = np.max(positions, axis=1)
+            pos_range = pos_max - pos_min
+            pos_center = (pos_max + pos_min) / 2
+            
+            print(f'      Bounding box: [{pos_min[0]:.2f}, {pos_min[1]:.2f}, {pos_min[2]:.2f}] to [{pos_max[0]:.2f}, {pos_max[1]:.2f}, {pos_max[2]:.2f}] m')
+            print(f'      Size: [{pos_range[0]:.2f}, {pos_range[1]:.2f}, {pos_range[2]:.2f}] m')
+            print(f'      Center: [{pos_center[0]:.2f}, {pos_center[1]:.2f}, {pos_center[2]:.2f}] m')
+            
+            # Analyze intensity if available (now supported by pyminiply!)
+            if 'intensity' in data:
+                intensity = data['intensity']
+                print(f'      Intensity available: range [{np.min(intensity):.4f}, {np.max(intensity):.4f}]')
+                print(f'      Intensity mean/std: {np.mean(intensity):.4f} ± {np.std(intensity):.4f}')
+        else:
+            print(f'    {name}: no pointcloud data loaded')
 
 
 def analyze_groundtruth_sensors(dataset, body_name):

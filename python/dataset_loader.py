@@ -174,6 +174,9 @@ def print_dataset_summary(dataset: Dict) -> None:
                 n_samples = len(data['t'])
                 duration = (data['t'][-1] - data['t'][0]) / 1e9 if n_samples > 1 else 0
                 print(f"    {sensor_name} ({sensor_type}): {n_samples} samples, {duration:.2f}s")
+            elif sensor_type == 'pointcloud' and 'positions' in data:
+                n_points = data['positions'].shape[1] if data['positions'].ndim > 1 else len(data['positions'])
+                print(f"    {sensor_name} ({sensor_type}): {n_points} points (static)")
             else:
                 print(f"    {sensor_name} ({sensor_type}): no data")
 
