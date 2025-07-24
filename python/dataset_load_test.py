@@ -36,6 +36,8 @@ def main():
                        help='Launch rerun visualization (equivalent to MATLAB dataset_plot)')
     parser.add_argument('--max-time', type=float, default=30.0,
                        help='Maximum time duration to visualize in seconds (default: 30s)')
+    parser.add_argument('--blueprint', type=str, default='',
+                       help='Path to rerun blueprint file (.rbl) to load instead of default blueprint')
     
     args = parser.parse_args()
     
@@ -77,7 +79,8 @@ def main():
                         recording_name=f"EuRoC_{args.dataset_path.split('/')[-1]}",
                         dataset_path=args.dataset_path,
                         spawn_viewer=True, 
-                        max_time_sec=args.max_time)
+                        max_time_sec=args.max_time,
+                        blueprint_path=args.blueprint)
             
         print('')
         print('✓ Dataset loading test completed successfully!')

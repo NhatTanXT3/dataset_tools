@@ -11,6 +11,7 @@ Provides interactive 3D visualization of:
 """
 
 import numpy as np
+import os
 import rerun as rr
 import rerun.blueprint as rrb
 from typing import Dict, List, Any, Optional
@@ -18,11 +19,12 @@ from dataset_loader import get_sensor_by_type, get_sensor_by_name
 from quaternion_utils import q_q2C
 
 
-def dataset_plot(dataset: Dict[str, List[Dict[str, Any]]],
+def dataset_plot(dataset: Dict[str, List[Dict[str, Any]]], 
                  recording_name: str = "",
                  dataset_path: str = "",
                  spawn_viewer: bool = True,
-                 max_time_sec: float = float('inf')):
+                 max_time_sec: float = float('inf'),
+                 blueprint_path: str = ""):
     """
     Plot dataset using rerun visualization (MATLAB dataset_plot equivalent)
     
@@ -32,9 +34,21 @@ def dataset_plot(dataset: Dict[str, List[Dict[str, Any]]],
         dataset_path: Path to the dataset
         spawn_viewer: Whether to spawn the rerun viewer automatically
         max_time_sec: Maximum time duration to visualize (for performance)
+        blueprint_path: Path to custom rerun blueprint file (.rbl), empty string uses default
     """
     # Setup rerun blueprint layout
-    blueprint = create_dataset_blueprint()
+    if blueprint_path and os.path.exists(blueprint_path):
+        print(f' >> Warning: Blueprint file loading from {blueprint_path} is not supported in this version')
+        print(' >> Using default blueprint instead')
+        blueprint = create_dataset_blueprint()
+    else:
+        if blueprint_path:
+            print(f' >> Warning: Blueprint file not found: {blueprint_path}')
+            print(' >> Using default blueprint instead')
+        blueprint = create_dataset_blueprint()
+    
+    print(f' recording name: {recording_name}, dataset path: {dataset_path}, blueprint path: {blueprint_path}')
+        
     if recording_name == "":
         recording_name = dataset_path.split('/')[-1]
     
@@ -683,19 +697,24 @@ def plot_camera_images(body: Dict[str, Any], dataset_path: str, reference_prefix
 
 
 # Convenience function for quick testing
-def plot_euroc_dataset(dataset_path: str, max_time_sec: float = 30.0) -> None:
+def plot_euroc_dataset(dataset_path: str, max_time_sec: float = 30.0, blueprint_path: str = "") -> None:
     """
     Quick plotting function for EuRoC datasets
     
     Args:
         dataset_path: Path to EuRoC dataset
         max_time_sec: Maximum time to visualize
+        blueprint_path: Optional path to custom blueprint file
     """
     from dataset_loader import dataset_load
     
     print(f"Loading and plotting EuRoC dataset: {dataset_path}")
     dataset = dataset_load(dataset_path)
-    dataset_plot(dataset, recording_name=f"EuRoC_{dataset_path.split('/')[-1]}", max_time_sec=max_time_sec)
+    dataset_plot(dataset, 
+                recording_name=f"EuRoC_{dataset_path.split('/')[-1]}", 
+                dataset_path=dataset_path,
+                max_time_sec=max_time_sec,
+                blueprint_path=blueprint_path)
 
 
 if __name__ == "__main__":
@@ -705,7 +724,8 @@ if __name__ == "__main__":
     if len(sys.argv) > 1:
         dataset_path = sys.argv[1]
         max_time = float(sys.argv[2]) if len(sys.argv) > 2 else 30.0
-        plot_euroc_dataset(dataset_path, max_time)
+        blueprint_path = sys.argv[3] if len(sys.argv) > 3 else ""
+        plot_euroc_dataset(dataset_path, max_time, blueprint_path)
     else:
         # Default test with EuRoC data
         plot_euroc_dataset("../../EuRoc_ASL/MH_01_easy", 30.0) 
