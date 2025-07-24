@@ -55,6 +55,7 @@ try:
     )
     from .sensor_data_loader import dataset_load_sensor_data
     from .dataset_plot import dataset_plot, plot_euroc_dataset
+    from .image_processing import CameraUndistorter, create_undistorter_for_sensor
     
     __all__ = [
         'dataset_load',
@@ -63,6 +64,8 @@ try:
         'print_dataset_summary',
         'dataset_plot',
         'plot_euroc_dataset',
+        'CameraUndistorter',
+        'create_undistorter_for_sensor',
         'q_min', 'q_C2q', 'q_q2C', 'q_mul', 'q_inv', 'q_norm', 'skew_op',
         'dataset_read_yaml', 
         'parse_transformation_matrix',

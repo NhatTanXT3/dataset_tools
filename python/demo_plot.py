@@ -72,6 +72,12 @@ def main():
         help='Print dataset summary before visualization'
     )
     
+    parser.add_argument(
+        '--undistort', 
+        action='store_true',
+        help='Apply camera undistortion to remove lens distortion (requires OpenCV)'
+    )
+    
     args = parser.parse_args()
     
     # List datasets and exit
@@ -101,6 +107,10 @@ def main():
     print(f"📂 Dataset: {dataset_name}")
     print(f"⏱️  Duration: {args.max_time}s")
     print(f"🎯 Path: {dataset_path}")
+    if args.undistort:
+        print(f"📷 Undistortion: Enabled (lens distortion will be corrected)")
+    else:
+        print(f"📷 Undistortion: Disabled (original images)")
     print("="*60)
     
     try:
@@ -118,6 +128,10 @@ def main():
         print("   • Show 3D sensor configuration and coordinate frames")
         print("   • Plot 3D trajectory with pose markers")
         print("   • Display IMU time series (gyroscope + accelerometer)")
+        if args.undistort:
+            print("   • Show undistorted camera images (lens distortion corrected)")
+        else:
+            print("   • Show original camera images")
         print("   • Visualize camera calibration data (if available)")
         print()
         
@@ -125,7 +139,8 @@ def main():
             dataset,
             dataset_path=dataset_path,
             spawn_viewer=not args.no_spawn,
-            max_time_sec=args.max_time
+            max_time_sec=args.max_time,
+            undistort_images=args.undistort
         )
         
         print("\n✅ Visualization complete!")

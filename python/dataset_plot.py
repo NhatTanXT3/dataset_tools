@@ -24,7 +24,8 @@ def dataset_plot(dataset: Dict[str, List[Dict[str, Any]]],
                  dataset_path: str = "",
                  spawn_viewer: bool = True,
                  max_time_sec: float = float('inf'),
-                 blueprint_path: str = ""):
+                 blueprint_path: str = "",
+                 undistort_images: bool = False):
     """
     Plot dataset using rerun visualization (MATLAB dataset_plot equivalent)
     
@@ -35,6 +36,7 @@ def dataset_plot(dataset: Dict[str, List[Dict[str, Any]]],
         spawn_viewer: Whether to spawn the rerun viewer automatically
         max_time_sec: Maximum time duration to visualize (for performance)
         blueprint_path: Path to custom rerun blueprint file (.rbl), empty string uses default
+        undistort_images: Whether to apply camera undistortion to images before visualization
     """
     # Setup rerun blueprint layout
     if blueprint_path and os.path.exists(blueprint_path):
@@ -90,10 +92,8 @@ def dataset_plot(dataset: Dict[str, List[Dict[str, Any]]],
         plot_inertial_sensor_measurements(body, reference_prefix, max_time_sec)
         
         # Plot camera images
-        plot_camera_images(body, dataset_path, reference_prefix, max_time_sec)
-        
-        # # Plot camera target observations
-        # plot_target_observations(body, reference_prefix, max_time_sec)
+        plot_camera_images(body, dataset_path, reference_prefix, max_time_sec, undistort_images)
+
     
     print(' >> rerun visualization complete')
     print(f' >> View at: http://localhost:9876 or rerun app')
@@ -189,7 +189,7 @@ def plot_body_sensor_setup(body: Dict[str, Any], reference_prefix: str) -> None:
             #     static=True,
             # )
             
-            print(f'     plotting world-reference frame transformation')
+            print(f'     plotting world-reference frame transformation', T_WR)
             break  # Only need to do this once per body
     
     # Plot sensors
@@ -498,106 +498,6 @@ def plot_estimated_ground_truth(body: Dict[str, Any], reference_prefix: str, max
         static=True,
     )
 
-    
-def plot_body_trajectory(body: Dict[str, Any], reference_prefix: str, max_time_sec: float = float('inf')) -> None:
-    """
-    Plot 3D trajectory with poses (MATLAB dataset_plot_body_trajectory equivalent)
-    
-    Args:
-        body: Body dictionary with sensor data
-        reference_prefix: Rerun path prefix for this body  
-        max_time_sec: Maximum time duration to plot
-    """
-    body_name = body['name']
-    sensors = body.get('sensor', [])
-    
-    # Find trajectory data from visual-inertial sensor
-    trajectory_data = None
-    trajectory_sensor = None
-    
-    for sensor in sensors:
-        if sensor.get('sensor_type') == 'visual-inertial':
-            data = sensor.get('data', {})
-            if 't' in data and 'p_RS_R' in data and 'q_RS' in data:
-                trajectory_data = data
-                trajectory_sensor = sensor
-                break
-    
-    if trajectory_data is None:
-        print(f'     no trajectory data found for body [{body_name}]')
-        return
-    
-    timestamps = trajectory_data['t']
-    positions = trajectory_data['p_RS_R']  # (3, N)
-    quaternions = trajectory_data['q_RS']  # (4, N) [qw, qx, qy, qz]
-    
-    # Filter by time if specified
-    if max_time_sec < float('inf'):
-        time_mask = (timestamps - timestamps[0]) / 1e9 <= max_time_sec
-        timestamps = timestamps[time_mask]
-        positions = positions[:, time_mask]
-        quaternions = quaternions[:, time_mask]
-    
-    n_poses = len(timestamps)
-    if n_poses == 0:
-        return
-    
-    print(f'     plotting trajectory with {n_poses} poses')
-    
-    # Convert timestamps to rerun time format
-    timestamps_ns = timestamps.astype('datetime64[ns]')
-    times = rr.TimeColumn("timestamp", timestamp=timestamps_ns)
-    
-    # Log trajectory as 3D line
-    rr.log(
-        f"{reference_prefix}/trajectory/path",
-        rr.LineStrips3D(
-            strips=[positions.T.tolist()],  # Convert (3, N) to (N, 3)
-            colors=[[0, 255, 255]],  # Cyan
-            radii=[0.002],
-        ),
-        static=True,
-    )
-    
-    # Log poses along trajectory (subsampled for performance)
-    subsample_factor = max(1, n_poses // 200)  # Aim for ~200 poses max
-    
-    pose_positions = []
-    pose_quaternions = []
-    pose_times = []
-    
-    for i in range(0, n_poses, subsample_factor):
-        pose_positions.append(positions[:, i].tolist())
-        # Rerun expects [x, y, z, w] quaternion format
-        q = quaternions[:, i]  # [qw, qx, qy, qz]
-        pose_quaternions.append([q[1], q[2], q[3], q[0]])  # Convert to [qx, qy, qz, qw]
-        pose_times.append(timestamps_ns[i])
-    
-    # Send poses as time-indexed transforms
-    if pose_positions:
-        times_subsampled = rr.TimeColumn("timestamp", timestamp=pose_times)
-        rr.send_columns(
-            f"{reference_prefix}/trajectory/poses",
-            indexes=[times_subsampled],
-            columns=rr.Transform3D.columns(
-                translation=pose_positions,
-                quaternion=pose_quaternions,
-            ),
-        )
-    
-    # Add coordinate frame visualization for poses (static, smaller)
-    rr.log(
-        f"{reference_prefix}/trajectory/poses/axes",
-        rr.Arrows3D(
-            origins=[[0, 0, 0], [0, 0, 0], [0, 0, 0]],
-            vectors=[[0.05, 0, 0], [0, 0.05, 0], [0, 0, 0.05]],
-            colors=[[255, 0, 0], [0, 255, 0], [0, 0, 255]],
-            labels=["X", "Y", "Z"],
-        ),
-        static=True,
-    )
-
-
 def plot_inertial_sensor_measurements(body: Dict[str, Any], reference_prefix: str, max_time_sec: float = float('inf')) -> None:
     """
     Plot IMU time series data (MATLAB dataset_plot_inertial_sensor_measurements equivalent)
@@ -662,132 +562,31 @@ def plot_inertial_sensor_measurements(body: Dict[str, Any], reference_prefix: st
             columns=rr.Scalars.columns(scalars=accel.T),  # Convert (3, N) to (N, 3)
         )
 
-
-def plot_target_observations(body: Dict[str, Any], reference_prefix: str, max_time_sec: float = float('inf')) -> None:
-    """
-    Plot camera target observations (MATLAB dataset_plot_target_observations equivalent)
-    
-    Args:
-        body: Body dictionary with sensor data
-        reference_prefix: Rerun path prefix for this body
-        max_time_sec: Maximum time duration to plot
-    """
-    body_name = body['name']
-    
-    # Find camera_target sensors
-    for sensor in body.get('sensor', []):
-        if sensor.get('sensor_type') == 'camera_target':
-            sensor_name = sensor['name']
-            data = sensor.get('data', {})
-            
-            if 'targetPoints_' not in data:
-                continue
-            
-            target_points = data['targetPoints_']  # (3, N_points)
-            
-            # Plot target points
-            rr.log(
-                f"{reference_prefix}/calibration/{sensor_name}/target_points",
-                rr.Points3D(
-                    positions=target_points.T,  # Convert (3, N) to (N, 3)
-                    colors=[[0, 0, 0]],  # Black points
-                    radii=[0.01],
-                ),
-                static=True,
-            )
-            
-            # Plot camera poses if available
-            if 'T_TC_' in data and 'q_TC_' in data and 'p_TC_T_' in data:
-                positions = data['p_TC_T_']  # (3, N)
-                quaternions = data['q_TC_']  # (4, N)
-                
-                n_poses = positions.shape[1]
-                subsample_factor = max(1, n_poses // 50)  # Subsample for performance
-                
-                # Plot camera trajectory
-                rr.log(
-                    f"{reference_prefix}/calibration/{sensor_name}/camera_path",
-                    rr.LineStrips3D(
-                        strips=[positions.T.tolist()],
-                        colors=[[0, 255, 0]],  # Green
-                        radii=[0.001],
-                    ),
-                    static=True,
-                )
-                
-                # Plot subsampled camera poses
-                for i in range(0, n_poses, subsample_factor):
-                    pos = positions[:, i]
-                    q = quaternions[:, i]  # [qw, qx, qy, qz]
-                    
-                    # Convert quaternion format for rerun
-                    quat_rerun = [q[1], q[2], q[3], q[0]]  # [qx, qy, qz, qw]
-                    
-                    rr.log(
-                        f"{reference_prefix}/calibration/{sensor_name}/poses/pose_{i}",
-                        rr.Transform3D(
-                            translation=pos,
-                            quaternion=quat_rerun,
-                        ),
-                        static=True,
-                    )
-                
-                # Add camera frame visualization
-                rr.log(
-                    f"{reference_prefix}/calibration/{sensor_name}/poses/axes",
-                    rr.Arrows3D(
-                        origins=[[0, 0, 0], [0, 0, 0], [0, 0, 0]],
-                        vectors=[[0.03, 0, 0], [0, 0.03, 0], [0, 0, 0.03]],
-                        colors=[[255, 0, 0], [0, 255, 0], [0, 0, 255]],
-                        labels=["X", "Y", "Z"],
-                    ),
-                    static=True,
-                )
-                
-            # Plot some observation rays if available
-            if ('undistortedMeasurements_' in data and 
-                len(data['undistortedMeasurements_']) > 0 and
-                'p_TC_T_' in data and 'q_TC_' in data):
-                
-                # Plot observation rays for first camera pose
-                pos = data['p_TC_T_'][:, 0]
-                q = data['q_TC_'][:, 0]
-                measurements = data['undistortedMeasurements_'][0]  # (3, N_corners)
-                
-                observation_scale = 2.0
-                R_TC = q_q2C(q)  # Convert quaternion to rotation matrix
-                
-                rays = []
-                for i in range(measurements.shape[1]):
-                    ray_end = pos + R_TC @ (observation_scale * measurements[:, i])
-                    rays.append([pos.tolist(), ray_end.tolist()])
-                
-                if rays:
-                    rr.log(
-                        f"{reference_prefix}/calibration/{sensor_name}/observation_rays",
-                        rr.LineStrips3D(
-                            strips=rays,
-                            colors=[[0, 255, 0]],  # Green rays
-                            radii=[0.001],
-                        ),
-                        static=True,
-                    )
-            
-            print(f'     plotting calibration data [{sensor_name}]')
-
-
-def plot_camera_images(body: Dict[str, Any], dataset_path: str, reference_prefix: str, max_time_sec: float = float('inf')) -> None:
+def plot_camera_images(body: Dict[str, Any], dataset_path: str, reference_prefix: str, max_time_sec: float = float('inf'), undistort_images: bool = False) -> None:
     """
     Plot camera images over time
     
     Args:
         body: Body dictionary with sensor data
+        dataset_path: Path to the dataset
         reference_prefix: Rerun path prefix for this body
         max_time_sec: Maximum time duration to plot
+        undistort_images: Whether to apply camera undistortion before visualization
     """
     import os
     body_name = body['name']
     sensors = body.get('sensor', [])
+    
+    # Import image processing for undistortion if needed
+    undistorters = {}
+    if undistort_images:
+        try:
+            from image_processing import create_undistorter_for_sensor
+            import cv2
+        except ImportError as e:
+            print(f'     Warning: Cannot import image processing modules for undistortion: {e}')
+            print('     Falling back to original images without undistortion')
+            undistort_images = False
     
     # Find camera sensors
     camera_sensors = []
@@ -800,6 +599,36 @@ def plot_camera_images(body: Dict[str, Any], dataset_path: str, reference_prefix
     if not camera_sensors:
         print(f'     no camera data found for body [{body_name}]')
         return
+    
+    # Create undistorters for camera sensors if undistortion is enabled
+    if undistort_images:
+        print(f'     setting up image undistortion for {len(camera_sensors)} camera sensors')
+        for sensor in camera_sensors:
+            sensor_name = sensor['name']
+            sensor_prefix = f"{reference_prefix}/{body_name}/{sensor_name}"
+            undistorter = create_undistorter_for_sensor(sensor)
+            if undistorter is not None:
+                undistorters[sensor_name] = undistorter
+                print(f'     undistorter created for sensor [{sensor_name}]')
+                
+                # Update camera intrinsics for Rerun pinhole with undistorted values
+                # undistorted_intrinsics = undistorter.get_undistorted_intrinsics()
+                # intrinsics_rerun = rr.datatypes.Mat3x3([
+                #     [undistorted_intrinsics['intrinsics'][0], 0, undistorted_intrinsics['intrinsics'][2]], 
+                #     [0, undistorted_intrinsics['intrinsics'][1], undistorted_intrinsics['intrinsics'][3]], 
+                #     [0, 0, 1]
+                # ])
+                # rr.log(
+                #     f"{sensor_prefix}/images",
+                #     rr.Pinhole(
+                #         image_from_camera=intrinsics_rerun,
+                #         resolution=undistorted_intrinsics['resolution'],
+                #     ),
+                #     static=True,
+                # )
+            else:
+                print(f'     failed to create undistorter for sensor [{sensor_name}], using original images')
+                undistorters[sensor_name] = None
     
     for sensor in camera_sensors:
         sensor_name = sensor['name']
@@ -821,6 +650,25 @@ def plot_camera_images(body: Dict[str, Any], dataset_path: str, reference_prefix
         
         # Log images individually with timestamps (more efficient for large binary data)
         sensor_prefix = f"{reference_prefix}/{body_name}/{sensor_name}"
+        rectified_prefix = f"{sensor_prefix}/rectified_images"
+        
+        # If undistortion is enabled and undistorter exists, log rectified pinhole model
+        if undistort_images and sensor_name in undistorters and undistorters[sensor_name] is not None:
+            undistorter = undistorters[sensor_name]
+            undistorted_intrinsics = undistorter.get_undistorted_intrinsics()
+            intrinsics_rerun = rr.datatypes.Mat3x3([
+                [undistorted_intrinsics['intrinsics'][0], 0, undistorted_intrinsics['intrinsics'][2]],
+                [0, undistorted_intrinsics['intrinsics'][1], undistorted_intrinsics['intrinsics'][3]],
+                [0, 0, 1]
+            ])
+            rr.log(
+                rectified_prefix,
+                rr.Pinhole(
+                    image_from_camera=intrinsics_rerun,
+                    resolution=undistorted_intrinsics['resolution'],
+                ),
+                static=True,
+            )
         
         for i, (timestamp, filename) in enumerate(zip(timestamps_ns, filenames)):
             # Set current timestamp
@@ -830,11 +678,25 @@ def plot_camera_images(body: Dict[str, Any], dataset_path: str, reference_prefix
             dataset_path_filename = os.path.join(dataset_path, body_name, sensor_name,'data', filename)
             if os.path.exists(dataset_path_filename):
                 try:
-                    # Use EncodedImage for better performance with large image files
+                    # Always log the raw image
                     rr.log(
                         f"{sensor_prefix}/images",
                         rr.EncodedImage(path=dataset_path_filename)
                     )
+                    # If undistortion is enabled, also log the rectified image
+                    if undistort_images and sensor_name in undistorters and undistorters[sensor_name] is not None:
+                        # Undistort the image
+                        undistorter = undistorters[sensor_name]
+                        undistorted_image = undistorter.undistort_image(dataset_path_filename)
+                        if undistorted_image is not None:
+                            # Convert BGR to RGB for Rerun (OpenCV uses BGR, Rerun expects RGB)
+                            undistorted_image_rgb = cv2.cvtColor(undistorted_image, cv2.COLOR_BGR2RGB)
+                            rr.log(
+                                f"{sensor_prefix}/rectified_images",
+                                rr.Image(undistorted_image_rgb)
+                            )
+                        else:
+                            print(f'     Warning: Failed to undistort image {dataset_path_filename}')
                 except Exception as e:
                     print(f'     Warning: Failed to load image {dataset_path_filename}: {e}')
             else:
@@ -847,7 +709,7 @@ def plot_camera_images(body: Dict[str, Any], dataset_path: str, reference_prefix
 
 
 # Convenience function for quick testing
-def plot_euroc_dataset(dataset_path: str, max_time_sec: float = 30.0, blueprint_path: str = "") -> None:
+def plot_euroc_dataset(dataset_path: str, max_time_sec: float = 30.0, blueprint_path: str = "", undistort_images: bool = False) -> None:
     """
     Quick plotting function for EuRoC datasets
     
@@ -855,16 +717,21 @@ def plot_euroc_dataset(dataset_path: str, max_time_sec: float = 30.0, blueprint_
         dataset_path: Path to EuRoC dataset
         max_time_sec: Maximum time to visualize
         blueprint_path: Optional path to custom blueprint file
+        undistort_images: Whether to apply camera undistortion
     """
     from dataset_loader import dataset_load
     
     print(f"Loading and plotting EuRoC dataset: {dataset_path}")
+    if undistort_images:
+        print("Image undistortion enabled - this may take longer but will show corrected camera images")
+    
     dataset = dataset_load(dataset_path)
     dataset_plot(dataset, 
                 recording_name=f"EuRoC_{dataset_path.split('/')[-1]}", 
                 dataset_path=dataset_path,
                 max_time_sec=max_time_sec,
-                blueprint_path=blueprint_path)
+                blueprint_path=blueprint_path,
+                undistort_images=undistort_images)
 
 
 if __name__ == "__main__":
@@ -875,7 +742,8 @@ if __name__ == "__main__":
         dataset_path = sys.argv[1]
         max_time = float(sys.argv[2]) if len(sys.argv) > 2 else 30.0
         blueprint_path = sys.argv[3] if len(sys.argv) > 3 else ""
-        plot_euroc_dataset(dataset_path, max_time, blueprint_path)
+        undistort = sys.argv[4].lower() == 'true' if len(sys.argv) > 4 else False
+        plot_euroc_dataset(dataset_path, max_time, blueprint_path, undistort)
     else:
         # Default test with EuRoC data
         plot_euroc_dataset("../../EuRoc_ASL/MH_01_easy", 30.0) 

@@ -111,6 +111,53 @@ python demo_plot.py --list-datasets         # Show available datasets
 python demo_plot.py --summary MH_02_easy    # With dataset summary
 ```
 
+### 📷 Camera Image Undistortion
+
+The Python implementation includes **camera image undistortion** to remove lens distortion effects:
+
+```python
+from dataset_tools.python import dataset_plot
+
+# Load and visualize dataset with undistorted images
+dataset = dataset_load('../../EuRoc_ASL/MH_01_easy')
+dataset_plot(dataset, undistort_images=True, max_time_sec=30.0)
+```
+
+**Features:**
+- **Radial-Tangential Distortion Correction**: Uses OpenCV's camera calibration algorithms
+- **Automatic Parameter Reading**: Extracts intrinsics and distortion coefficients from `sensor.yaml`
+- **Optimized Camera Matrix**: Updates Rerun Pinhole camera with corrected intrinsics
+- **Efficient Processing**: Caches undistortion maps for fast image processing
+
+**Requirements:**
+- OpenCV (`pip install opencv-python`)
+- Camera sensors with `radial-tangential` distortion model
+
+**Demo with Undistortion:**
+```bash
+# Enable undistortion in demo script
+python demo_plot.py MH_01_easy 30 --undistort              # With undistortion
+python demo_plot.py --undistort --summary                  # Default with undistortion
+python dataset_plot.py ../../EuRoc_ASL/MH_01_easy 30 "" true  # Direct script call
+
+# Test undistortion functionality
+python image_processing.py ../../EuRoc_ASL/MH_01_easy cam0  # Test and save undistorted images
+```
+
+**Supported Configuration (from sensor.yaml):**
+```yaml
+camera_model: pinhole
+intrinsics: [458.654, 457.296, 367.215, 248.375]  # [fu, fv, cu, cv]
+distortion_model: radial-tangential
+distortion_coefficients: [-0.28340811, 0.07395907, 0.00019359, 1.76187114e-05]  # [k1, k2, p1, p2]
+resolution: [752, 480]
+```
+
+**Before vs After:**
+- **Original**: Shows images with visible barrel/pincushion distortion
+- **Undistorted**: Straight lines appear straight, corrected field of view
+- **Updated Intrinsics**: Rerun camera model uses optimized focal lengths and principal points
+
 ## 🔧 Command Line Usage
 
 ### Dataset Loading and Analysis
@@ -132,6 +179,9 @@ python dataset_load_test.py --summary-only
 
 # With interactive visualization (equivalent to MATLAB dataset_plot)
 python dataset_load_test.py --plot --max-time 60
+
+# With undistorted camera images
+python dataset_load_test.py --plot --undistort --max-time 30
 ```
 
 ### Interactive Visualization

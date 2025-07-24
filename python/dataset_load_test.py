@@ -38,6 +38,8 @@ def main():
                        help='Maximum time duration to visualize in seconds (default: 30s)')
     parser.add_argument('--blueprint', type=str, default='',
                        help='Path to rerun blueprint file (.rbl) to load instead of default blueprint')
+    parser.add_argument('--undistort', action='store_true',
+                       help='Apply camera undistortion to remove lens distortion')
     
     args = parser.parse_args()
     
@@ -80,7 +82,8 @@ def main():
                         dataset_path=args.dataset_path,
                         spawn_viewer=True, 
                         max_time_sec=args.max_time,
-                        blueprint_path=args.blueprint)
+                        blueprint_path=args.blueprint,
+                        undistort_images=args.undistort)
             
         print('')
         print('✓ Dataset loading test completed successfully!')
