@@ -73,8 +73,9 @@ def main():
         if args.plot:
             print('')
             print('Launching rerun visualization...')
-            dataset_plot(dataset, 
-                        recording_name=f"EuRoC_{args.dataset_path.split('/')[-1]}", 
+            dataset_plot(dataset,
+                        recording_name=f"EuRoC_{args.dataset_path.split('/')[-1]}",
+                        dataset_path=args.dataset_path,
                         spawn_viewer=True, 
                         max_time_sec=args.max_time)
             

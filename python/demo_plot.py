@@ -122,8 +122,8 @@ def main():
         print()
         
         dataset_plot(
-            dataset, 
-            recording_name=f"EuRoC_{dataset_name}",
+            dataset,
+            dataset_path=dataset_path,
             spawn_viewer=not args.no_spawn,
             max_time_sec=args.max_time
         )
