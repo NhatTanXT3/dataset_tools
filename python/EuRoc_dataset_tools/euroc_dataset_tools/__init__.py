@@ -9,6 +9,8 @@ This package provides Python tools for loading ASL format datasets.
 try:
     from .dataset_loader import (
         dataset_load, 
+        get_dataset_path,
+        get_camera_images_info,
         get_sensor_by_name, 
         get_sensor_by_type, 
         print_dataset_summary
@@ -27,6 +29,8 @@ try:
     
     __all__ = [
         'dataset_load',
+        'get_dataset_path',
+        'get_camera_images_info',
         'get_sensor_by_name', 
         'get_sensor_by_type',
         'print_dataset_summary',
