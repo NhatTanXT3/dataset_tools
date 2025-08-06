@@ -9,7 +9,7 @@ import os
 import numpy as np
 import pandas as pd
 from typing import Dict, Any, Union
-from quaternion_utils import q_min, q_C2q
+from .quaternion_utils import q_min, q_C2q
 
 try:
     from plyfile import PlyData, PlyElement

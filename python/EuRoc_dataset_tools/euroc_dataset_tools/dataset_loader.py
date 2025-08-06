@@ -8,8 +8,8 @@ Loads hierarchical dataset structure: dataset.body[i].sensor[j].data
 import os
 import numpy as np
 from typing import Dict, List, Any
-from yaml_reader import dataset_read_yaml, extract_sensor_parameters
-from sensor_data_loader import dataset_load_sensor_data
+from .yaml_reader import dataset_read_yaml, extract_sensor_parameters
+from .sensor_data_loader import dataset_load_sensor_data
 
 
 def dataset_load(dataset_path: str) -> Dict[str, List[Dict[str, Any]]]:

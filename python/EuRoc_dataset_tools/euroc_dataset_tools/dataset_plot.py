@@ -15,8 +15,8 @@ import os
 import rerun as rr
 import rerun.blueprint as rrb
 from typing import Dict, List, Any, Optional
-from dataset_loader import get_sensor_by_type, get_sensor_by_name
-from quaternion_utils import q_q2C
+from .dataset_loader import get_sensor_by_type, get_sensor_by_name
+from .quaternion_utils import q_q2C
 
 
 def dataset_plot(dataset: Dict[str, List[Dict[str, Any]]], 
@@ -177,17 +177,17 @@ def plot_body_sensor_setup(body: Dict[str, Any], reference_prefix: str) -> None:
             )
             
             # Add world reference frame axes
-            # rr.log(
-            #     f"{reference_prefix}/world_axes",
-            #     rr.Arrows3D(
-            #         origins=[[0, 0, 0], [0, 0, 0], [0, 0, 0]],
-            #         vectors=[[1.0, 0, 0], [0, 1.0, 0], [0, 0, 1.0]],
-            #         colors=[[255, 0, 0], [0, 255, 0], [0, 0, 255]],  # Red, Green, Blue
-            #         labels=["World_X", "World_Y", "World_Z"],
-            #         show_labels=True
-            #     ),
-            #     static=True,
-            # )
+            rr.log(
+                f"{reference_prefix}/axes",
+                rr.Arrows3D(
+                    origins=[[0, 0, 0], [0, 0, 0], [0, 0, 0]],
+                    vectors=[[1.0, 0, 0], [0, 1.0, 0], [0, 0, 1.0]],
+                    colors=[[255, 0, 0], [0, 255, 0], [0, 0, 255]],  # Red, Green, Blue
+                    labels=["World_X", "World_Y", "World_Z"],
+                    show_labels=False
+                ),
+                static=True,
+            )
             
             print(f'     plotting world-reference frame transformation', T_WR)
             break  # Only need to do this once per body
@@ -379,7 +379,7 @@ def plot_position_ground_truth(body: Dict[str, Any], reference_prefix: str, max_
     
     for sensor in sensors:
         sensor_type = sensor['sensor_type']
-        if sensor_type == 'position':
+        if sensor_type == 'position' or sensor_type == 'pose':
             data = sensor.get('data', {})
             if 't' in data and 'p_RS_R' in data:
                 position_data = data
@@ -581,7 +581,7 @@ def plot_camera_images(body: Dict[str, Any], dataset_path: str, reference_prefix
     undistorters = {}
     if undistort_images:
         try:
-            from image_processing import create_undistorter_for_sensor
+            from .image_processing import create_undistorter_for_sensor
             import cv2
         except ImportError as e:
             print(f'     Warning: Cannot import image processing modules for undistortion: {e}')
@@ -719,7 +719,7 @@ def plot_euroc_dataset(dataset_path: str, max_time_sec: float = 30.0, blueprint_
         blueprint_path: Optional path to custom blueprint file
         undistort_images: Whether to apply camera undistortion
     """
-    from dataset_loader import dataset_load
+    from .dataset_loader import dataset_load
     
     print(f"Loading and plotting EuRoC dataset: {dataset_path}")
     if undistort_images:

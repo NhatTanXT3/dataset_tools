@@ -14,8 +14,8 @@ import sys
 import argparse
 from pathlib import Path
 
-from dataset_loader import dataset_load, print_dataset_summary
-from dataset_plot import dataset_plot
+from .dataset_loader import dataset_load, print_dataset_summary
+from .dataset_plot import dataset_plot
 
 # Available EuRoC datasets in standard location
 AVAILABLE_DATASETS = {

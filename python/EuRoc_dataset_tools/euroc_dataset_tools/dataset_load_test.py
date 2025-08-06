@@ -14,9 +14,9 @@ from pathlib import Path
 # Add current directory to Python path for imports
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-from dataset_loader import dataset_load, print_dataset_summary, get_sensor_by_name, get_sensor_by_type
-from quaternion_utils import validate_quaternion_conventions
-from dataset_plot import dataset_plot
+from .dataset_loader import dataset_load, print_dataset_summary, get_sensor_by_name, get_sensor_by_type
+from .quaternion_utils import validate_quaternion_conventions
+from .dataset_plot import dataset_plot
 import numpy as np
 
 

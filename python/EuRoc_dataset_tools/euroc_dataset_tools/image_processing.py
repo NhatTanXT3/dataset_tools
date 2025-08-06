@@ -300,7 +300,7 @@ def test_undistortion(dataset_path: str, sensor_name: str = "cam0", max_images: 
         print("OpenCV not available, cannot test undistortion")
         return
     
-    from dataset_loader import dataset_load, get_sensor_by_name
+    from .dataset_loader import dataset_load, get_sensor_by_name
     
     print(f"Testing undistortion on dataset: {dataset_path}")
     
